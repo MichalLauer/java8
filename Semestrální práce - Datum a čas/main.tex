@@ -1,0 +1,462 @@
+% Cílem je vytvořit referát / cvičebnici od studentů pro studenty na další semestry.
+% 1) Popis tématu, teoretické vysvětlení problému včetně ilustrací
+% 2) Ukázky kódu
+% 3) Několik příkladů k procvičení
+% 4) Zdroje
+% -----------------------------------------------------------------------
+% https://en.wikibooks.org/wiki/LaTeX/Document_Structure#Document_classes
+\documentclass[11pt,a4paper,titlepage]{article}
+\usepackage[czech]{babel}
+
+% Citation
+% https://zbib.org/
+% http://mirrors.nic.cz/tex-archive/macros/latex/contrib/biblatex/doc/biblatex.pdf
+% http://mirrors.ibiblio.org/CTAN/macros/latex/exptl/biblatex-contrib/biblatex-iso690/biblatex-iso690.pdf
+\usepackage{csquotes}
+\usepackage[style=iso-authoryear]{biblatex}
+\addbibresource{ref.bib}
+
+% Image caption on left side
+\usepackage{caption}
+\captionsetup{justification=raggedright,singlelinecheck=false}
+
+% http://ftp.cvut.cz/tex-archive/macros/latex/contrib/titlesec/titlesec.pdf
+\usepackage{titlesec}
+\newcommand{\sectionbreak}{\clearpage}
+\newcommand{\subsectionbreak}{\clearpage}
+\newcommand{\subsubsectionbreak}{\clearpage}
+\titleformat{\paragraph}[hang]{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{0.1em}
+
+% Style setup
+\usepackage[colorlinks=true,urlcolor=blue,linkcolor=black,citecolor=black,breaklinks=true]{hyperref}
+\usepackage{indentfirst}
+\setlength{\parskip}{1em}
+\addtocontents{toc}{\setlength{\parskip}{0.3em}}
+
+% List setup
+\usepackage{enumitem}
+\setlist{nosep}
+\setitemize{itemsep=4pt}
+
+% http://ftp.cvut.cz/tex-archive/macros/xetex/generic/xesearch/xesearch.pdf
+\usepackage{xesearch}
+\titleformat{\section} {\normalfont\Large\bfseries}{\thesection}{1em}{\StopSearching}[\StartSearching]
+\titleformat{\subsection} {\normalfont\large\bfseries}{\thesubsection}{1em}{\StopSearching}[\StartSearching]
+\titleformat{\subsubsection} {\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{\StopSearching}[\StartSearching]
+
+% Code styling
+\usepackage{minted}
+\setminted{frame=lines,framesep=2mm,baselinestretch=1.3,fontsize=\footnotesize}
+\BeforeBeginEnvironment{minted}{\vspace{-6mm}}
+\AfterEndEnvironment{minted}{\vspace{-6mm}}
+
+\title{Java 8 - práce s datem a časem}
+\author{Michal Lauer\\4it101}
+\date{\small{2019/2020 - Letní semestr}}
+
+\begin{document}
+
+\pagenumbering{gobble}
+\maketitle
+\tableofcontents
+\newpage
+\SearchList{javaWords}{\textit{#1}}{LocalTime?,LocalDate?,LocalDateTime?,ZonedDateTime?,ZoneId?,Period?,Duration?,ChronoUnit?,DateTimeFormatter?}
+
+\pagenumbering{arabic}
+\section{Problémy ve verzí Java 7}
+Práce s datem a časem byla ve verzi 7 velmi kostrbatá, a to nejen z toho důvodu, že s datem a časem pracovala pomocí jedné třídy. Nebyla stejná časová zóna (defaultně UTC, ale mohla se lišit podle JVM), instance byli neintuitivní, indexování a pozice byli nekonzistentní a byl "proměnlivý" (ang. \textit{mutable}). Pojďme si uvést nějaké příklady
+\begin{itemize}
+    \item \textbf{Date(int rok, int měsíc, int den)}
+    \begin{itemize}
+        \item rok - počítá se od roku 1900. Proto pro vytvoření roku 2020 jste museli zadat rok 120 (2020 - 1900)
+        \item Měsíc - počítání začíná na 0, proto prosinec = 11
+    \end{itemize}
+    \item \textbf{Proměnlivost}
+    \begin{itemize}
+        \item Při kopírování se zkopíroval pouze odkaz na dané datum - úprava jednoho data ovlivňila i datum druhé
+    \end{itemize}
+    \item \textbf{SQL}
+    \begin{itemize}
+        \item Pro vložení data do SQL se musel Date převést na java.sql.Date, který reprezentuje \textbf{pouze jeden den}.
+    \end{itemize}
+
+\end{itemize}
+Jak je vidět, datum a čas v Javě 7 byl velmi chaotický, proto přechod na nové API byl nevyhnutelný.
+\parencite{java7_date}
+\section{Java 8}
+V této sekci si představíme nejzákladnější třídy, které využijeme při práci s časem a datem . LocalDate, LocalTime, LocalDateTime. Rozdělujeme zde údaj na údaj s časovou zónou (\textbf{"zoned"} a údaj bez časové zóny \textit{"local"}. Pokud budeme chtít zjistit délku mezi daty, použijeme jednu z následujících tříd
+\begin{itemize}
+    \item Duration - pro rozdíl v čase
+    \item Period - rozdíl v datu
+    \item ChronoUnit - rozdíl mezi datem a časem najednou (lze použít i jednotlivě)
+\end{itemize}
+Dále existuje možnost čas i datum formátovat pomocí třídy DateTimeFormatter, kde nalezneme předdefinované styly. Pokud nebudou stačit přednastavené styly, můžeme si vytvořit vlastní.
+\parencite{java7_overflow}
+
+Pro vytvoření se používají z pravidla statické metody. Lze získat aktuální čas/datum, čas/datum z jiné časové zóny nebo čas/datum dle vlastního uvážení (vlastní nastavění, podle čas. zóny).Třídy si prve musíme naimportovat
+\begin{minted}{java}
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+\end{minted}
+a tak dále pro ostatní třídy.
+
+V textu níže si představíme již zmíněné třídy a metody k nim. Pokud chcete dále rozšířit své znalosti, \href{https://docs.oracle.com/javase/8/docs/}{podívejte se do oficiální dokumentace pro Javu 8}.
+\subsection{LocalDate}
+LocalDate je třída, která představuje \textbf{pouze informaci o datu.}. Třída kromě data (YYYY-MM-DD) ukládá informace o dni v kalendáři (den v týdnu, den v roce aj.) Pro vytvoření instance použijeme jeden z následujících atributů či metod
+\begin{itemize}
+    \item \textbf{MIN}
+    \begin{itemize}
+        \item Vrátí nejmenší možné datum (-999999999-01-01).
+    \end{itemize}
+    \item \textbf{MAX}
+    \begin{itemize}
+        \item Vrátí největší možné datum (+999999999-12-31)
+    \end{itemize}
+    \item \textbf{now([ZoneId zóna])}\footnote{LocalDate sice s čas. zónou nepracuje, ale v tomto případě jenom předáváme časovou zónu pomocí parametru - vzniklá instance bude bez časové zóny}
+    \begin{itemize}
+        \item získá aktuální datum v časovém pásmu. Můžeme předat nepovinný parametr \href{https://en.wikipedia.org/wiki/List_of_tz_database_time_zones}{časové zóny} 
+    \end{itemize}
+    \item \textbf{of(int rok, int měsíc, int den)}
+    \begin{itemize}
+        \item vytvoří datum podle stanovených hodnot
+    \end{itemize}
+    \item \textbf{parse(CharSequence text [, DateTimeFormater formát])}
+    \begin{itemize}
+        \item vytvoří datum podle zadaného textu a popř. formátu \footnote{defaultně se bere v potaz formátování ISO-8601 - YYYY-MM-DD}
+    \end{itemize}
+    \item \textbf{ofYearDay(int rok, int denVRoce)}
+    \begin{itemize}
+        \item Vrátí den podle počtu uplynulých dní od začátku roku
+    \end{itemize}
+\end{itemize}
+\newpage
+Na instanci můžeme použít například tyto metody
+\begin{itemize}
+    \item \textbf{minusYears(long odečíst), plusYears(long odečíst)} atd.
+    \begin{itemize}
+        \item odečte/přičte požadovanou složku data
+    \end{itemize}
+    \item \textbf{withDayOfMonth(int měsíc), withDayOfyear(int denVRoce)}
+    \begin{itemize}
+        \item nastaví den v měsíci nebo den v roce
+    \end{itemize}
+    \item \textbf{withMonth(int měsíc), withYear(int denVRoce)}
+    \begin{itemize}
+        \item nastaví měsíc nebo rok
+    \end{itemize}
+        \item \textbf{getDayOfMonth(), getMonthValue()}
+    \begin{itemize}
+        \item vrátí enum složku dnu v týdnu či měsíce
+    \end{itemize}
+    \item \textbf{compareTo(LocalDate datum2)}
+    \begin{itemize}
+        \item porovná pár dat, tj. datum1 - datum2
+        \item -1 -> datum2 je v budoucnu; 0 -> data jsou stejná; > 0 --> datum2 je v minulosti 
+    \end{itemize}
+\end{itemize}
+Pro reprezentaci měsíce můžeme použít buď čísla, nebo enum Months. Metody se změní tímto způsobem
+\begin{itemize}
+    \item \textbf{withMonth(\underline{Month} měsíc)}
+    \item \textbf{.of(int rok, \underline{Month} měsíc, int den)}
+\end{itemize}
+dále můžeme reprezentovat den v týdnu, což je hlavně užitečně s metodou get
+\begin{itemize}
+    \item \textbf{getDayOfWeek(\underline{Weekday} den)}
+\end{itemize}
+\parencite{java8_localdate}
+\subsubsection{LocalDate kódově}
+\begin{minted}{java}
+LocalDate ldNow = LocalDate.now();
+LocalDate ldAustralia = LocalDate.now(ZoneId.of("Australia/Canberra"));
+System.out.println("Den u tebe: " + ldNow.getDayOfWeek());
+System.out.println("Den v Austrálii: " + ldAustralia.getDayOfWeek());
+System.out.println("Jsi pozadu? --> " + ldNow.isBefore(ldAustralia));
+
+LocalDate ldCustom = LocalDate.of(1234, 7,18);
+System.out.println("Den v týdnu: " + ldCustom.getDayOfWeek());
+System.out.println("Den v roce: " + ldCustom.getDayOfYear());
+System.out.println("Měsíc v roce: " + ldCustom.getMonth());
+System.out.println("Délka měsíce: " + ldCustom.lengthOfMonth());
+System.out.println("Éra: " + ldCustom.getEra());
+\end{minted}
+\subsection{LocalTime}
+Jak jsme se již dozvěděli, v osmé verzi Javy je čas, datum a časová zóna rozdělená. Ve třídě LocalTime proto najdeme \textbf{pouze lokální čas (bez čas. zóny) s přesností na nanosekundu.} Jelikož má třída LocalTime privátní konstruktor, musíme vytvořit proměnnou a inicializovat tam hodnotu, kterou nám třída nabízí. Prve se podíváme na 4 vlastnosti třídy
+\begin{itemize}
+    \item \textbf{MIN} - nejmenší podporovaná hodnota (00:00)
+    \item \textbf{MAX} - největší podporovaná hodnota (23.59.99)
+    \item \textbf{MIDNIGHT} - čas o půlnoci (stejné jako MIN)
+    \item \textbf{NOON} - čas o pravém poledni
+\end{itemize}
+Proměnnou dále můžeme naplnit metodami
+\begin{itemize}
+    \item \textbf{now([ZoneId zóna])}\footnote{LocalTime sice s čas. zónou nepracuje, ale v tomto případě jenom předáváme časovou zónu pomocí parametru - vzniklá instance bude bez časové zóny}
+    \begin{itemize}
+        \item získá aktuální čas. Můžeme předat nepovinný parametr \href{https://en.wikipedia.org/wiki/List_of_tz_database_time_zones}{časové zóny} 
+    \end{itemize}
+    \item \textbf{of(int hodina, int minuta [, int sekunda] [, int nanosekunda])}
+    \begin{itemize}
+        \item vytvoří čas podle stanovených hodnot
+    \end{itemize}
+    \item \textbf{parse(CharSequence text [, DateTimeFormater formát])}
+    \begin{itemize}
+        \item vytvoří čas podle zadaného textu a popř. formátu \footnote{defaultně se bere v potaz formátování ISO-8601 - HH:MM[:SS]}
+    \end{itemize}
+\end{itemize}
+S časem můžeme manipulovat použitím metod
+\begin{itemize}
+    \item \textbf{minusHours(long odečíst), plusHours(long odečíst)} atd.
+    \begin{itemize}
+        \item odečte/přičte požadovaný čas
+    \end{itemize}
+    \item \textbf{withHour(int hodina), withMinute(hodina)} atd.
+    \begin{itemize}
+        \item nastaví požadovaný časový údaj
+    \end{itemize}
+    \item \textbf{getHour(), getMinute()} atd.
+    \begin{itemize}
+        \item vrátí požadovanou časovou jednotku
+    \end{itemize}
+    \item \textbf{compareTo(LocalTime čas2)}
+    \begin{itemize}
+        \item porovná dva časové údaje, tj. čas1 - čas2
+        \item -1 -> čas2 je v budoucnu; 0 -> časy jsou stejné; > 0 --> čas2 je v minulosti
+    \end{itemize}
+\end{itemize}
+\parencite{java8_localtime}\newline
+\subsubsection{LocalTime kódově}
+\begin{minted}{java}
+LocalTime ltNow = LocalTime.now();
+System.out.println("ltNow = " + ltNow);
+ltNow.minusHours(9);
+ltNow.plusMinutes(53);
+System.out.println("Čas u tebe: " + ltNow);
+
+LocalTime ltLondon = LocalTime.now(ZoneId.of("Europe/London"));
+System.out.println("Čas v Londýně: " + ltLondon);
+ltLondon = ltLondon.withHour(LocalTime.now().getHour());
+System.out.println("Čas v Londýně ale jakoby v Praze: " + ltLondon);
+
+if (LocalTime.now().compareTo(LocalTime.NOON) == -1){
+    System.out.println("Měl by jsi jít ještě spát, je před polednem!");
+}
+else if (LocalTime.now().compareTo(LocalTime.NOON) == 1){
+    System.out.println("Už jdi spát, je dávno po poledni!");
+}
+else{
+    System.out.println("Dej si šlofíka, je pravé poledne!");
+}
+\end{minted}
+\subsection{LocalDateTime}
+Jak již bylo naznačeno, čas a datum je v Java 8 rozdělen do tříd LocalDate a LocalTime. Třída LocalDateTime kombinuje obě třídy a přidává nám možnost uložit datum i čas do jednoho objektu pořád \textbf{(bez časové zóny).} Lze vytvořit jednou z následujících metod
+\begin{itemize}
+    \item \textbf{now([ZoneId zóna])}\footnote{LocalDateTime sice s čas. zónou nepracuje, ale v tomto případě jenom předáváme časovou zónu pomocí parametru - vzniklá instance bude bez časové zóny}
+    \begin{itemize}
+        \item získá aktuální datum a čas v časovém pásmu. Můžeme předat nepovinný parametr \href{https://en.wikipedia.org/wiki/List_of_tz_database_time_zones}{časové zóny} 
+    \end{itemize}
+    \item \textbf{of(int rok, int měsíc, int den, int hodina, int minuta [, int sekunda, int nanosekunda]}
+    \begin{itemize}
+        \item vytvoří instanci s požadovaným datem a časem
+    \end{itemize}
+    \item \textbf{if(LocalDate datum, LocalTime čas)}
+    \begin{itemize}
+        \item vytvoří LocalDateTime podle tříd LocalDate a LocalTime
+    \end{itemize}
+    \item \textbf{parse(CharSequence text [, DateTimeFormatter formát])}
+    \begin{itemize}
+        \item instance se vytvoří podle zadaného textu, popř. formátu
+    \end{itemize}
+\end{itemize}
+Pokud bychom měli již zadaný LocalTime a chtěli k němu přidat datum (vytvořit třídu LocalDateTime), můžeme použít na čas funkci čas.atDate(LocalDate datum). Samozřejmě nový LocalDateTime musíme někam uložit
+\begin{minted}{java}
+LocalDateTime ldt = LocalTime.now().atDate(LocalDate.now());
+\end{minted}
+V opačném případě - tedy tvoření LocalDateTime z data - lze použít metoda .atTime(int hodina, int minuta[, int sekunda, int nanosekunda]), resp.
+\begin{minted}{java}
+LocalDateTime ldt = LocalDate.now().atTime(12,30,34,12);
+\end{minted}
+Finální instance třídy obsahuje mnoho metod - mimo jiné i metody ze tříd LocalDate a LocalTime. Rád bych ale zmínil metody, které sice \textbf{obsahují třídy LocalDate a LocalTime, ale nebyly zmíněny.}
+\begin{itemize}
+    \item \textbf{isAfter(ChronologicalDateTime druhýLDT)}
+    \item \textbf{isBefore(ChronologicalDateTime druhýLDT)}
+    \item \textbf{isEqual(ChronologicalDateTime druhýLDT)}
+    \begin{itemize}
+        \item ChronologicalDateTime je interface, ale můžeme místo něj dosadit třídu LocalDateTime
+    \end{itemize}
+\end{itemize}
+\parencite{java8_localdatetime}\newline
+\subsubsection{LocalDateTime kódově}
+\label{sec:ldt}
+\begin{minted}{java}
+LocalTime lt = LocalTime.now();
+LocalDate ld = LocalDate.now();
+LocalDateTime ltdOfInstances = LocalDateTime.of(ld, lt);
+LocalDateTime ltdSingapore = LocalDateTime.now(ZoneId.of("Asia/Singapore"));
+System.out.println("Čas a datum u tebe: " + ltdOfInstances);
+System.out.println("Čas a datum v Singapuru: " + ltdSingapore);
+
+ltdOfInstances = ltdOfInstances.plusDays(6);
+System.out.println(ltdOfInstances.isBefore(ltdSingapore));
+\end{minted}
+\subsection{ZonedDateTime}
+Třída ZonedDateTime obsahuje datum, čas a přidanou časovou zónu. Pro určení časové zóny budeme používat funkci .of(String časZóna) \parencite{java8_zoneid}
+\begin{minted}{java}
+ZoneId zID = ZoneId.of("Europe/Prague");
+\end{minted}
+Nyní stačí vytvořit instanci pomocí metod, které jsme si již představili, akorát přidáme parametr pro časovou zónu. Důležité je poznamenat, že ZoneID \textbf{převede čas jenom s kombinací .now(ZoneID id).}. Při vytváření metodou .of() přidá pouze časový rozdíl od GMT/UTC jako text, proto je důležité \textbf{přiřadit správnou časovou zónu!} Podívejme se na příklad
+\begin{minted}{java}
+ZonedDateTime ldtNow = ZonedDateTime.now();
+//2020-04-26T17:35:45.284+02:00[Europe/Prague]
+ZonedDateTime ldtNowNY = ZonedDateTime.now(ZoneId.of("America/New_York"));
+//2020-04-26T11:35:45.284-04:00[America/New_York]
+LocalDate ld = LocalDate.now();
+LocalTime lt = LocalTime.now();
+ZoneId zId = ZoneId.of("America/New_York");
+ZonedDateTime ldtOfZoneID = ZonedDateTime.of(ld, lt, zId);
+//2020-04-26T17:35:45.284-04:00[America/New_York]
+\end{minted}
+Ostatní instanční funkce jsou více méně stejné, akorát stačí přidat ZoneId parametr. Pro příklady se podívejte na \underline{\hyperref[sec:ldt]{LocalDateTime v kódu}}.\parencite{java8_zoneddatetime}\linebreak
+\subsection{Duration, Period a ChronoUnit}
+\paragraph{Duration}
+Pomocí duration můžeme měřit čas. Použijeme metodu .between(LocalTime lt1, LocalTime lt2) a dále metodu .getSeconds(). Pro zjištění minut či hodin musíme hodnotu vydělit. \parencite{java8_duration}
+\begin{minted}{java}
+LocalTime lt1 = LocalTime.now();
+LocalTime lt2 = LocalTime.now().plusHours(4);
+Duration d = Duration.between(lt1, lt2);
+System.out.println("Rozdíl v sekundách: " + d.getSeconds());
+System.out.println("Rozdíl v minutách: " + d.getSeconds()/60);
+System.out.println("Rozdíl v hodinách: " + d.getSeconds()/3600);
+\end{minted}
+\paragraph{Period}
+Třída Period se používá na měření rozdílu v datech. Použijeme metodu .between(LocalDate ld1, LocalDate ld2). Výsledek lze zjistit pomocí .getDays(), getMonths(), .getYears(). \parencite{java8_period}
+\begin{minted}{java}
+LocalDate ld1 = LocalDate.now();
+LocalDate ld2 = LocalDate.now().plusYears(3).plusDays(40);
+Period p = Period.between(ld1, ld2);
+System.out.println("Rozdíl ve dnech: " + p.getDays());
+System.out.println("Rozdíl ve měsícich: " + p.getMonths());
+System.out.println("Rozdíl ve letech: " + p.getYears());
+\end{minted}
+\newpage
+\paragraph{ChronoUnit}
+Pokud chceme zjistit rozdíl mezi LocalDateTime, slouží nám k tomu třída ChronoUnit. Díky ní lze zjistit nejen rozdíl mezi LocalDateTime, ale i \textbf{mezi LocalDate a LocalTime}. Pro zjištění výsledku použijeme ChronoUnits.\textit{hodnota, kterou chceme zjistit}. Dále klasicky použijeme .between(LocalDateTime ldt1, LocalDateTime ldt2). \parencite{java8_chronounit}
+\begin{minted}{java}
+LocalTime lt1 = LocalTime.now(ZoneId.of("America/New_York"));
+LocalDate ld1 = LocalDate.now(ZoneId.of("Australia/Canberra"));
+LocalDateTime ldt1 = LocalDateTime.now();
+LocalDateTime ldt2 = LocalDateTime.now().plusDays(62).plusHours(13);
+System.out.println("Rozdíl ve dnech: " + ChronoUnit.DAYS.between(ldt1, ldt2));
+System.out.println("Rozdíl v hodinách: " + ChronoUnit.HOURS.between(ldt1, ldt2));
+System.out.println("Rozdíl v sekundách: " + ChronoUnit.SECONDS.between(lt1, ldt1));
+System.out.println("Rozdíl ve dnech: " + ChronoUnit.DAYS.between(ld1, ldt2));
+\end{minted}
+\subsection{DateTimeFormatter}
+Pro formátování datumu a času používáme třídu DateTimeFormatter. Máme zde několik přednastavených formátů
+\begin{itemize}
+    \item ISO{\textunderscore}LOCAL{\textunderscore}DATE --> 2011-12-03
+    \item ISO{\textunderscore}LOCAL{\textunderscore}TIME --> 10:15:30
+    \item \href{https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html#predefined}{a mnoho dalších}
+\end{itemize}
+Dále můžeme nastavit vlastní formátování díky metodě \textit{DateTimeFormatter.ofPattern(\textbf{pattern})}. V kódu to může vypadat následovně
+\begin{minted}{java}
+    LocalDateTime ldt = LocalDateTime.now();
+    System.out.println(ldt.format(DateTimeFormatter.ofPattern("H:MM YYYY/MM/dd")));
+\end{minted}
+Všechny zkratky naleznete v \href{https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html#patterns}{dokumentaci}.
+\paragraph{Hlídání chyb}
+Pokud chceme převést text (např. vstup od uživatele) na časovou či datumovou hodnotu, používáme metodu .parse(). Nikdy si ale nemůžeme být jisti, jestli uživatel zadal správný formát. Proto při parsování textu používáme klauzuli try-catch s výjimkou DateTimeParseException. Použití je následující
+\begin{minted}{java}
+Scanner scan = new Scanner(System.in);
+System.out.println("Zadejte datum ve formátu dd-MM-yyyy");
+String date = scan.nextLine();
+LocalDate ld = null;
+try {
+    ld = LocalDate.parse(date, DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+} catch (DateTimeParseException e){
+    System.out.println(e.getMessage());
+}
+\end{minted}
+\parencite{java8_datetimeformatter}
+\section{Příklady k procvičení}
+\subsection{Procvičení LocalDate}
+\paragraph{Zadání}
+Uživatel vloží jeden pár dat ve formátu "YYYY-MM-DD". Zjistěte rozdíl mezi datumy ve dnech.
+
+Rada: Scanner, try-catch
+\paragraph{Řešení}
+\begin{minted}{java}
+Scanner scan = new Scanner(System.in);
+System.out.println("Zadejte první datum ve formátu YYYY-MM-DD");
+String d1 = scan.nextLine();
+System.out.println("Zadejte druhé datum ve formátu YYYY-MM-DD");
+String d2 = scan.nextLine();
+try{
+    LocalDate ld2 = LocalDate.parse(d2);
+    LocalDate ld1 = LocalDate.parse(d1);
+    System.out.println("Rozdíl ve dnech je: " + Period.between(ld1, ld2).getDays());
+} catch(DateTimeParseException e){
+    System.out.println(e.getLocalizedMessage());
+}
+\end{minted}
+\subsection{Procvičení LocalTime}
+\paragraph{Zadání}
+Uživatel vloží čas ve formátu HH:MM. Po ověření správného formátu bude uživatel dotázán, aby přidal takový čas, který po přičtení k původnímu vytvoří poledne. Pokud zadá špatný čas, bude znovu dotázán na přidání času.
+\paragraph{Řešení}
+\begin{minted}{java}
+Scanner scan = new Scanner(System.in);
+System.out.println("Zadejte čas ve formátu HH:MM >> ");
+String t1 = scan.nextLine();
+LocalTime lt = null;
+try{
+    lt = LocalTime.parse(t1);
+} catch(DateTimeParseException e){
+    System.out.println(e.getMessage());
+}
+System.out.println("Zadaný čas je: " + lt);
+while(!lt.equals(LocalTime.NOON)){
+    System.out.println("Zadejte čas tak, aby bylo poledne >> ");
+    String novyT = scan.nextLine();
+    try{
+        LocalTime temp = LocalTime.parse(novyT);
+        lt = lt.plusHours(temp.getHour()).plusMinutes(lt.getMinute());
+    } catch (DateTimeParseException e){
+        System.out.println(e.getMessage());
+    }
+    if (lt.equals(LocalTime.NOON)){
+        System.out.println("Super, splněno!");
+    } else{
+        System.out.println("Výsledný čas: " + lt + "\nZkus to ještě jednou:)");
+    }
+}
+\end{minted}
+\subsection{Procvičení LocalDateTime, DateTimeFormatter}
+\paragraph{Zadání}
+Vypište všechny dny v aktuálním měsíci. Pokud se den rovná aktuálnímu dni, vypište celé datum ve formátu "dd-MM-YYYY". Dále vypište každou hodinu. Pokud se hodina rovná aktuální hodině, vypište čas ve formátu "hh:mm".
+
+Rada: for, DateTimeFormatter
+\paragraph{Řešení}
+\begin{minted}{java}
+LocalDateTime dnes = LocalDateTime.now();
+for(int i = 1; i <= dnes.getMonth().maxLength(); i++){
+    if(dnes.getDayOfMonth() == i){
+        System.out.println(">> " + dnes.format(DateTimeFormatter.ofPattern("dd-MM-YYYY")));
+    } else {
+        System.out.println(dnes.withDayOfMonth(i).getDayOfMonth());
+    }
+}
+for(int i = 0; i < 24;i++){
+    if(dnes.getHour() == i){
+        System.out.println(">> " + dnes.format(DateTimeFormatter.ofPattern("hh:mm")));
+    } else {
+        System.out.println(dnes.withHour(i).getHour());
+    }
+}
+\end{minted}
+\subsection{GitHub}
+Pro lepší práci s kódem jsou všechny ukázky kódu a příklady k procvičení nahrané na mém \href{https://github.com/MichalLauer/java8}{github účtu}.
+
+\hypersetup{urlcolor=black}
+\printbibliography
+
+\end{document}
